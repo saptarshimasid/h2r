@@ -228,11 +228,11 @@ section:focus, footer:focus { outline: none; }
 .price-badge { display: inline-block; padding: 5px 12px; font-size: 9px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: #090b0a; background: #9aff00; }
 .price-value { font-family: Impact, "Arial Black", "Helvetica Neue", sans-serif; font-size: clamp(2.8rem, 4.5vw, 4.2rem); font-weight: 900; letter-spacing: -.04em; line-height: 1; }
 .price-card.is-featured .price-value { color: #9aff00; }
-.price-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.price-features { list-style: none; padding: 0; margin: 0 0 24px 0; display: flex; flex-direction: column; gap: 14px; }
 .price-features li { position: relative; padding-left: 22px; font-size: 13px; line-height: 1.5; color: #b7c0ba; }
 .price-features li::before { content: ""; position: absolute; left: 0; top: 6px; width: 10px; height: 10px; border-radius: 2px; background: #9aff0025; border: 1px solid #9aff0055; }
 .price-card.is-featured .price-features li::before { background: #9aff0040; border-color: #9aff0080; }
-.price-cta { display: flex; width: 100%; align-items: center; justify-content: center; gap: 10px; padding: 18px 24px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #c5cec8; border: 1px solid #ffffff20; background: transparent; transition: background .3s, color .3s, border-color .3s, box-shadow .3s; }
+.price-cta { margin-top: 32px; display: flex; width: 100%; align-items: center; justify-content: center; gap: 10px; padding: 18px 24px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #c5cec8; border: 1px solid #ffffff20; background: transparent; transition: background .3s, color .3s, border-color .3s, box-shadow .3s; }
 .price-cta:hover { border-color: #9aff0070; color: #9aff00; box-shadow: 0 0 25px #9aff000f; }
 .price-cta.is-featured { color: #090b0a; background: #9aff00; border-color: #9aff00; }
 .price-cta.is-featured:hover { background: #b8ff50; box-shadow: 0 0 35px #9aff0020; }

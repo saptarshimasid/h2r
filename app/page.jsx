@@ -920,7 +920,7 @@ export default function Home() {
                     <ul className="price-features mb-10 flex-1" role="list">
                       {plan.features.map((f) => <li key={f}>{f}</li>)}
                     </ul>
-                    <button type="button" className={`price-cta ${plan.featured ? "is-featured" : ""}`}>{plan.cta} <Arrow /></button>
+                    <button type="button" className={`price-cta mt-8 ${plan.featured ? "is-featured" : ""}`}>{plan.cta} <Arrow /></button>
                   </article>
                 </div>
               ))}
