@@ -99,6 +99,22 @@
   font-family: "Courier New", monospace; font-size: 9px; font-weight: 500;
   letter-spacing: 0.18em; text-transform: uppercase; color: #4a5a4d;
 }
+.loader-sound-badge {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 24px;
+  font-family: "Courier New", monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: #9aff00;
+  background: rgba(154, 255, 0, 0.08); border: 1px solid rgba(154, 255, 0, 0.28);
+  border-radius: 999px; padding: 5px 14px;
+}
+.loader-sound-pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: #9aff00;
+  box-shadow: 0 0 8px #9aff00;
+  animation: pulse-dot 1.2s infinite ease-in-out alternate;
+}
+@keyframes pulse-dot {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.4); opacity: 1; }
+}
 
 /* Brand mark at bottom */
 .loader-brand-row {

@@ -15,9 +15,8 @@ const IMAGES = {
   tire: "https://img.stcrm.it/images/294799/1200x/kawasaki-h2-dettagli-19.png",
 };
 
-// Set to "/media/h2r.mp3" after adding a licensed recording to public/media.
-// With null, the button plays a clearly labelled synthesized sound design demo.
-const ENGINE_AUDIO_URL = null;
+// Loud bike acceleration audio
+const ENGINE_AUDIO_URL = "/media/h2r-acceleration.wav";
 const NAV = [
   ["The machine", "beast"],
   ["Performance", "performance"],
@@ -205,7 +204,7 @@ function useEngineSound() {
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [volume, setVolume] = useState(0.35);
+  const [volume, setVolume] = useState(0.85);
 
   const stop = () => {
     const current = resource.current;
@@ -229,7 +228,7 @@ function useEngineSound() {
   useEffect(() => {
     const current = resource.current;
     if (current?.audio) current.audio.volume = volume;
-    if (current?.master) current.master.gain.setTargetAtTime(volume * 0.12, current.context.currentTime, 0.04);
+    if (current?.master) current.master.gain.setTargetAtTime(volume * 0.7, current.context.currentTime, 0.04);
   }, [volume]);
 
   const toggle = async () => {
@@ -254,7 +253,7 @@ function useEngineSound() {
         const filter = context.createBiquadFilter();
         const current = { context, master };
         resource.current = current;
-        master.gain.value = volume * 0.12;
+        master.gain.value = volume * 0.7;
         filter.type = "lowpass";
         filter.frequency.value = 1600;
         filter.Q.value = 0.8;
@@ -361,82 +360,221 @@ export default function Home() {
 
     document.body.style.overflow = "hidden";
 
-    // ── Synthesized engine rev sound ──
+    // ── Loud Superbike Engine Rev Sound ──
     function startEngineSound() {
+      let audioEl = null;
+      let audioCtx = null;
+      let master = null;
+      let filter = null;
+      let harmonics = [];
+      let whine = null;
+      let whineGain = null;
+      let lfo = null;
+      let noiseGain = null;
+
+      // 1. Play loud recorded acceleration audio file
+      try {
+        audioEl = new Audio("/media/h2r-acceleration.wav");
+        audioEl.volume = 1.0;
+        const playPromise = audioEl.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch(() => {});
+        }
+      } catch {}
+
+      // 2. Synthesized high-octane Web Audio engine (with compressor, waveshaping distortion & high volume)
       try {
         const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        audioCtx = new AC();
-        const master = audioCtx.createGain();
-        master.gain.value = 0.06;
-        master.connect(audioCtx.destination);
+        if (AC) {
+          audioCtx = new AC();
 
-        // Low-pass filter simulates muffled engine
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.frequency.value = 800;
-        filter.Q.value = 1.2;
-        filter.connect(master);
+          // Master compressor for loud wall-of-sound punch without digital clipping
+          const compressor = audioCtx.createDynamicsCompressor();
+          compressor.threshold.setValueAtTime(-18, audioCtx.currentTime);
+          compressor.knee.setValueAtTime(10, audioCtx.currentTime);
+          compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+          compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+          compressor.release.setValueAtTime(0.12, audioCtx.currentTime);
+          compressor.connect(audioCtx.destination);
 
-        // LFO for rpm flutter
-        const lfo = audioCtx.createOscillator();
-        const lfoGain = audioCtx.createGain();
-        lfo.frequency.value = 0.3;
-        lfoGain.gain.value = 30;
-        lfo.connect(lfoGain);
+          // Overdrive distortion curve (tanh saturation for metallic exhaust rasp)
+          const distortion = audioCtx.createWaveShaper();
+          const n_samples = 2048;
+          const curve = new Float32Array(n_samples);
+          const k = 22;
+          const deg = Math.PI / 180;
+          for (let i = 0; i < n_samples; ++i) {
+            const x = (i * 2) / n_samples - 1;
+            curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+          }
+          distortion.curve = curve;
+          distortion.oversample = "4x";
+          distortion.connect(compressor);
 
-        // Engine harmonics (fundamental + overtones)
-        const harmonics = [65, 130, 195, 260].map((freq, i) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = i < 2 ? "sawtooth" : "triangle";
-          osc.frequency.value = freq;
-          gain.gain.value = 0.35 / (i + 1);
-          lfoGain.connect(osc.frequency);
-          osc.connect(gain);
-          gain.connect(filter);
-          osc.start();
-          return { osc, gain, baseFreq: freq };
-        });
+          master = audioCtx.createGain();
+          master.gain.value = 0.55; // Loud initial ignition volume!
+          master.connect(distortion);
 
-        // Supercharger whine
-        const whine = audioCtx.createOscillator();
-        const whineGain = audioCtx.createGain();
-        whine.type = "sine";
-        whine.frequency.value = 1200;
-        whineGain.gain.value = 0;
-        whine.connect(whineGain);
-        whineGain.connect(master);
-        whine.start();
-        lfo.start();
+          // Exhaust gas resonant lowpass filter
+          filter = audioCtx.createBiquadFilter();
+          filter.type = "lowpass";
+          filter.frequency.value = 1400;
+          filter.Q.value = 2.2;
+          filter.connect(master);
 
-        audioCtx.resume();
+          // Engine rumble LFO
+          lfo = audioCtx.createOscillator();
+          const lfoGain = audioCtx.createGain();
+          lfo.frequency.value = 0.5;
+          lfoGain.gain.value = 45;
+          lfo.connect(lfoGain);
 
-        return { audioCtx, master, filter, harmonics, whine, whineGain, lfo };
-      } catch { return null; }
+          // Inline-4 firing harmonics (fundamental + 5 harmonics)
+          // 68 Hz base at idle (~2,000 RPM) -> 466 Hz at redline (14,000 RPM)
+          const baseFreqs = [68, 136, 204, 272, 340, 476];
+          harmonics = baseFreqs.map((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = i < 2 ? "sawtooth" : i % 2 === 0 ? "triangle" : "sawtooth";
+            osc.frequency.value = freq;
+            gain.gain.value = 0.45 / (i * 0.75 + 1);
+            lfoGain.connect(osc.frequency);
+            osc.connect(gain);
+            gain.connect(filter);
+            osc.start();
+            return { osc, gain, baseFreq: freq };
+          });
+
+          // Exhaust gas rush (white noise burst through bandpass)
+          const bufferSize = audioCtx.sampleRate * 2;
+          const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const outputData = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            outputData[i] = Math.random() * 2 - 1;
+          }
+          const noiseNode = audioCtx.createBufferSource();
+          noiseNode.buffer = noiseBuffer;
+          noiseNode.loop = true;
+          const noiseFilter = audioCtx.createBiquadFilter();
+          noiseFilter.type = "bandpass";
+          noiseFilter.frequency.value = 1200;
+          noiseFilter.Q.value = 1.5;
+          noiseGain = audioCtx.createGain();
+          noiseGain.gain.value = 0.08;
+          noiseNode.connect(noiseFilter);
+          noiseFilter.connect(noiseGain);
+          noiseGain.connect(master);
+          noiseNode.start();
+
+          // Supercharger planetary gear whistle (screaming siren)
+          whine = audioCtx.createOscillator();
+          whineGain = audioCtx.createGain();
+          whine.type = "sawtooth";
+          whine.frequency.value = 1400;
+          whineGain.gain.value = 0.04;
+          const whineFilter = audioCtx.createBiquadFilter();
+          whineFilter.type = "bandpass";
+          whineFilter.frequency.value = 2400;
+          whineFilter.Q.value = 3.5;
+          whine.connect(whineFilter);
+          whineFilter.connect(whineGain);
+          whineGain.connect(master);
+          whine.start();
+          lfo.start();
+
+          audioCtx.resume().catch(() => {});
+        }
+      } catch {}
+
+      // Instant audio unlock listener on user tap/click
+      const unlock = () => {
+        if (audioEl && audioEl.paused) {
+          audioEl.currentTime = 0;
+          audioEl.play().catch(() => {});
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+          audioCtx.resume().catch(() => {});
+        }
+      };
+      window.addEventListener("pointerdown", unlock, { once: true });
+      window.addEventListener("keydown", unlock, { once: true });
+
+      return { audioEl, audioCtx, master, filter, harmonics, whine, whineGain, lfo, noiseGain, unlock };
     }
 
-    // Ramp the engine sound as RPM increases (0→1 progress)
+    // Ramp engine sound loudly as RPM increases (0→1 progress)
     function updateEngineSound(audio, progress) {
-      if (!audio) return;
+      if (!audio || !audio.audioCtx) return;
       const t = audio.audioCtx.currentTime;
-      const rpmMult = 1 + progress * 3.5; // frequency multiplier
+      const rpmMult = 1 + progress * 5.8; // scales fundamental from 68 Hz to 462 Hz
       audio.harmonics.forEach(({ osc, baseFreq }) => {
-        osc.frequency.setTargetAtTime(baseFreq * rpmMult, t, 0.08);
+        osc.frequency.setTargetAtTime(baseFreq * rpmMult, t, 0.06);
       });
-      audio.filter.frequency.setTargetAtTime(800 + progress * 3200, t, 0.08);
-      audio.master.gain.setTargetAtTime(0.06 + progress * 0.07, t, 0.05);
-      audio.whineGain.gain.setTargetAtTime(progress * 0.04, t, 0.1);
-      audio.whine.frequency.setTargetAtTime(1200 + progress * 3800, t, 0.08);
-      audio.lfo.frequency.setTargetAtTime(0.3 + progress * 12, t, 0.08);
+      // Filter opens up as exhaust pressure surges
+      audio.filter.frequency.setTargetAtTime(1400 + progress * 5600, t, 0.06);
+      // Volume climbs loud from 0.55 to 0.92
+      audio.master.gain.setTargetAtTime(0.55 + progress * 0.37, t, 0.04);
+      // Supercharger screams up to 6.2 kHz
+      if (audio.whine && audio.whineGain) {
+        audio.whineGain.gain.setTargetAtTime(0.04 + progress * 0.28, t, 0.06);
+        audio.whine.frequency.setTargetAtTime(1400 + progress * 4800, t, 0.06);
+      }
+      // Exhaust gas rush intensifies
+      if (audio.noiseGain) {
+        audio.noiseGain.gain.setTargetAtTime(0.08 + progress * 0.25, t, 0.06);
+      }
+      if (audio.lfo) {
+        audio.lfo.frequency.setTargetAtTime(0.5 + progress * 24, t, 0.06);
+      }
     }
 
-    // Fade out engine sound
+    // Quickshifter ignition cut pop on gear changes
+    function triggerShiftPop(audio) {
+      if (!audio || !audio.audioCtx) return;
+      try {
+        const ctx = audio.audioCtx;
+        const now = ctx.currentTime;
+        // Brief ignition cut dip
+        audio.master.gain.setValueAtTime(0.12, now);
+        audio.master.gain.setTargetAtTime(0.8, now + 0.035, 0.04);
+
+        // Explosive exhaust bang
+        const popOsc = ctx.createOscillator();
+        const popGain = ctx.createGain();
+        popOsc.type = "sawtooth";
+        popOsc.frequency.setValueAtTime(110, now);
+        popOsc.frequency.exponentialRampToValueAtTime(35, now + 0.08);
+        popGain.gain.setValueAtTime(0.95, now);
+        popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        popOsc.connect(popGain);
+        popGain.connect(ctx.destination);
+        popOsc.start(now);
+        popOsc.stop(now + 0.09);
+      } catch {}
+    }
+
+    // Fade out engine sound smoothly
     function fadeOutEngine(audio) {
       if (!audio) return;
-      const t = audio.audioCtx.currentTime;
-      audio.master.gain.setTargetAtTime(0, t, 0.15);
-      setTimeout(() => { audio.audioCtx.close().catch(() => {}); }, 600);
+      if (audio.unlock) {
+        window.removeEventListener("pointerdown", audio.unlock);
+        window.removeEventListener("keydown", audio.unlock);
+      }
+      if (audio.audioEl) {
+        const el = audio.audioEl;
+        const interval = setInterval(() => {
+          if (el.volume > 0.1) el.volume = Math.max(0, el.volume - 0.15);
+          else {
+            clearInterval(interval);
+            try { el.pause(); } catch {}
+          }
+        }, 40);
+      }
+      if (audio.master && audio.audioCtx) {
+        const t = audio.audioCtx.currentTime;
+        audio.master.gain.setTargetAtTime(0, t, 0.12);
+        setTimeout(() => { audio.audioCtx.close().catch(() => {}); }, 500);
+      }
     }
 
     const audio = startEngineSound();
@@ -509,6 +647,7 @@ export default function Home() {
           currentGear = gear;
           if (gearEl) gearEl.textContent = gears[gear];
           if (statusEl && gear > 0) statusEl.textContent = gear === 6 ? "REDLINE" : `GEAR ${gear} ENGAGED`;
+          triggerShiftPop(audio);
         }
         // Update engine sound
         updateEngineSound(audio, pct);
@@ -599,6 +738,12 @@ export default function Home() {
                 <span className="loader-rpm-num">0</span> RPM
               </div>
               <div className="loader-status">STANDBY</div>
+            </div>
+
+            {/* Loud sound badge */}
+            <div className="loader-sound-badge" aria-hidden="true">
+              <span className="loader-sound-pulse" />
+              <span>Loud Sound Enabled · H2R Roar</span>
             </div>
           </div>
 
