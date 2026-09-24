@@ -10,26 +10,111 @@
 :root { color-scheme: dark; background: #090b0a; color: #f3f4ef; }
 * { box-sizing: border-box; }
 
-/* Loader */
+/* ── Loader: Ignition Sequence ── */
 .loader-screen {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: #090b0a;
-  clip-path: inset(0 0 0% 0);
+  background: #050706;
+  overflow: hidden;
+}
+/* Scan lines overlay */
+.loader-screen::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, #00000018 2px, #00000018 4px);
+}
+/* Ambient vignette */
+.loader-screen::after {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 40%, #000000cc 100%);
 }
 .loader-inner {
-  display: flex; flex-direction: column; align-items: center; gap: 28px;
-  width: 100%; max-width: 340px; padding: 0 24px;
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; height: 100%; max-width: 900px; padding: 0 32px;
 }
-.loader-tacho { width: 180px; height: 180px; position: relative; }
-.loader-tacho-svg { width: 100%; height: 100%; overflow: visible; }
-.loader-brand { display: flex; align-items: center; gap: 12px; }
-.loader-logo { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; }
-.loader-line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, #9aff0055, transparent); }
-.loader-bottom { display: flex; width: 100%; justify-content: space-between; align-items: center; }
-.loader-label { font-family: "Courier New", monospace; font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: #7c8a7d; }
-.loader-percent { font-family: Impact, "Arial Black", "Helvetica Neue", sans-serif; font-size: 40px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
-.loader-counter { color: #f3f4ef; }
+
+/* Speed streaks */
+.loader-streaks {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+}
+.loader-streak {
+  position: absolute; left: -10%; height: 1px; opacity: 0;
+  background: linear-gradient(90deg, transparent, #9aff0040, #9aff00, transparent);
+}
+
+/* Giant H2R title */
+.loader-h2r {
+  font-family: Impact, "Arial Black", "Helvetica Neue", sans-serif;
+  font-size: clamp(8rem, 22vw, 20rem);
+  font-weight: 900; letter-spacing: -0.06em; line-height: 0.85;
+  color: transparent; -webkit-text-stroke: 1.5px #ffffff15;
+  position: relative; user-select: none;
+}
+.loader-h2r-fill {
+  position: absolute; inset: 0;
+  font-family: inherit; font-size: inherit; font-weight: inherit;
+  letter-spacing: inherit; line-height: inherit;
+  color: #f3f4ef;
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Glitch flicker */
+.loader-glitch {
+  position: absolute; inset: 0; opacity: 0; pointer-events: none;
+  font-family: inherit; font-size: inherit; font-weight: inherit;
+  letter-spacing: inherit; line-height: inherit;
+  color: #9aff00; mix-blend-mode: screen;
+}
+
+/* RPM bar */
+.loader-rpm-track {
+  width: 100%; max-width: 520px; height: 3px; margin-top: 48px;
+  background: #ffffff0a; position: relative; overflow: hidden;
+}
+.loader-rpm-fill {
+  position: absolute; inset: 0; right: 100%;
+  background: linear-gradient(90deg, #9aff00, #d4ff70);
+  box-shadow: 0 0 20px #9aff0050, 0 0 60px #9aff0020;
+}
+
+/* Data row: gear + RPM + status */
+.loader-data {
+  display: flex; width: 100%; max-width: 520px; justify-content: space-between;
+  align-items: baseline; margin-top: 20px;
+}
+.loader-gear {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 28px; font-weight: 900; color: #9aff00; letter-spacing: -0.02em;
+}
+.loader-gear-num { display: inline-block; min-width: 20px; text-align: center; }
+.loader-rpm-val {
+  font-family: "Courier New", monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase; color: #7c8a7d;
+}
+.loader-rpm-num {
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 22px; color: #f3f4ef; letter-spacing: -0.03em; margin-right: 4px;
+}
+.loader-status {
+  font-family: "Courier New", monospace; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase; color: #4a5a4d;
+}
+
+/* Brand mark at bottom */
+.loader-brand-row {
+  position: absolute; bottom: 40px; left: 0; right: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  opacity: 0;
+}
+.loader-brand-text {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #5a6a5d;
+}
+
+/* Flash overlay for launch */
+.loader-flash {
+  position: absolute; inset: 0; z-index: 10;
+  background: #9aff00; opacity: 0; pointer-events: none;
+}
 html { scroll-padding-top: 86px; }
 body { margin: 0; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
 ::selection { color: #090b0a; background: #9aff00; }

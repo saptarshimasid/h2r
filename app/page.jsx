@@ -352,49 +352,189 @@ export default function Home() {
   const loaderRef = useRef(null);
   useExperience(root, scrollRef);
 
-  // Loader animation
+  // ── Ignition Sequence Loader ──
   useEffect(() => {
     if (!loading || !loaderRef.current) return;
     const el = loaderRef.current;
     const q = gsap.utils.selector(el);
+    let audioCtx = null;
 
-    // Lock scroll during load
     document.body.style.overflow = "hidden";
 
+    // ── Synthesized engine rev sound ──
+    function startEngineSound() {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        audioCtx = new AC();
+        const master = audioCtx.createGain();
+        master.gain.value = 0.06;
+        master.connect(audioCtx.destination);
+
+        // Low-pass filter simulates muffled engine
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 800;
+        filter.Q.value = 1.2;
+        filter.connect(master);
+
+        // LFO for rpm flutter
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        lfo.frequency.value = 0.3;
+        lfoGain.gain.value = 30;
+        lfo.connect(lfoGain);
+
+        // Engine harmonics (fundamental + overtones)
+        const harmonics = [65, 130, 195, 260].map((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = i < 2 ? "sawtooth" : "triangle";
+          osc.frequency.value = freq;
+          gain.gain.value = 0.35 / (i + 1);
+          lfoGain.connect(osc.frequency);
+          osc.connect(gain);
+          gain.connect(filter);
+          osc.start();
+          return { osc, gain, baseFreq: freq };
+        });
+
+        // Supercharger whine
+        const whine = audioCtx.createOscillator();
+        const whineGain = audioCtx.createGain();
+        whine.type = "sine";
+        whine.frequency.value = 1200;
+        whineGain.gain.value = 0;
+        whine.connect(whineGain);
+        whineGain.connect(master);
+        whine.start();
+        lfo.start();
+
+        audioCtx.resume();
+
+        return { audioCtx, master, filter, harmonics, whine, whineGain, lfo };
+      } catch { return null; }
+    }
+
+    // Ramp the engine sound as RPM increases (0→1 progress)
+    function updateEngineSound(audio, progress) {
+      if (!audio) return;
+      const t = audio.audioCtx.currentTime;
+      const rpmMult = 1 + progress * 3.5; // frequency multiplier
+      audio.harmonics.forEach(({ osc, baseFreq }) => {
+        osc.frequency.setTargetAtTime(baseFreq * rpmMult, t, 0.08);
+      });
+      audio.filter.frequency.setTargetAtTime(800 + progress * 3200, t, 0.08);
+      audio.master.gain.setTargetAtTime(0.06 + progress * 0.07, t, 0.05);
+      audio.whineGain.gain.setTargetAtTime(progress * 0.04, t, 0.1);
+      audio.whine.frequency.setTargetAtTime(1200 + progress * 3800, t, 0.08);
+      audio.lfo.frequency.setTargetAtTime(0.3 + progress * 12, t, 0.08);
+    }
+
+    // Fade out engine sound
+    function fadeOutEngine(audio) {
+      if (!audio) return;
+      const t = audio.audioCtx.currentTime;
+      audio.master.gain.setTargetAtTime(0, t, 0.15);
+      setTimeout(() => { audio.audioCtx.close().catch(() => {}); }, 600);
+    }
+
+    const audio = startEngineSound();
+    const rpmObj = { value: 0 };
+    const gearEl = q(".loader-gear-num")[0];
+    const rpmNumEl = q(".loader-rpm-num")[0];
+    const statusEl = q(".loader-status")[0];
+    const gears = [" N", " 1", " 2", " 3", " 4", " 5", " 6"];
+    let currentGear = 0;
+
+    // ── Main timeline ──
     const tl = gsap.timeline({
       onComplete: () => {
-        // Exit animation
-        gsap.to(el, {
-          clipPath: "inset(0 0 100% 0)",
-          duration: 0.85,
-          ease: "power4.inOut",
+        // Launch flash + exit
+        const exitTl = gsap.timeline({
           onComplete: () => {
+            fadeOutEngine(audio);
             setLoading(false);
             document.body.style.overflow = "";
           },
         });
+        exitTl
+          .to(q(".loader-flash"), { opacity: 0.85, duration: 0.12, ease: "power2.in" })
+          .to(q(".loader-flash"), { opacity: 0, duration: 0.4, ease: "power2.out" })
+          .to(el, { opacity: 0, duration: 0.35, ease: "power2.in" }, 0.15);
       },
     });
 
-    // Stagger the entrance
-    tl.from(q(".loader-brand"), { opacity: 0, y: 20, duration: 0.6, ease: "power3.out" })
-      .from(q(".loader-line"), { scaleX: 0, duration: 0.5, ease: "power2.out" }, 0.2)
-      .fromTo(q(".loader-needle"), { rotation: -135 }, { rotation: 135, duration: 1.8, ease: "power2.out", svgOrigin: "100 100" }, 0.3)
-      .fromTo(q(".loader-counter"), { innerText: 0 }, {
-        innerText: 100,
-        duration: 1.8,
-        ease: "power2.out",
-        snap: { innerText: 1 },
-        onUpdate: function () {
-          const target = this.targets()[0];
-          if (target) target.textContent = Math.round(this.targets()[0].innerText || 0);
-        },
-      }, 0.3)
-      .from(q(".loader-label"), { opacity: 0, y: 10, duration: 0.5 }, 0.5)
-      .to({}, { duration: 0.3 }); // Brief hold before exit
+    // Phase 1: Brand + status appear
+    tl.from(q(".loader-brand-row"), { opacity: 0, duration: 0.5, ease: "power2.out" })
+      .set(q(".loader-brand-row"), { opacity: 1 })
+      .to(statusEl, { duration: 0.01, onComplete: () => { if (statusEl) statusEl.textContent = "IGNITION ON"; } }, 0.3);
+
+    // Phase 2: H2R title glitch reveal
+    tl.to(q(".loader-glitch"), { opacity: 1, duration: 0.05 }, 0.5)
+      .to(q(".loader-glitch"), { opacity: 0, x: -3, duration: 0.05 }, 0.55)
+      .to(q(".loader-glitch"), { opacity: 0.8, x: 2, duration: 0.04 }, 0.62)
+      .to(q(".loader-glitch"), { opacity: 0, x: 0, duration: 0.05 }, 0.66)
+      .to(q(".loader-h2r-fill"), { clipPath: "inset(0 0% 0 0)", duration: 0.8, ease: "power3.inOut" }, 0.6)
+      .to(q(".loader-glitch"), { opacity: 0.6, x: -4, duration: 0.03 }, 1.0)
+      .to(q(".loader-glitch"), { opacity: 0, x: 0, duration: 0.06 }, 1.03);
+
+    // Phase 3: RPM climb + gear shifts — the main rev sequence
+    tl.to(statusEl, { duration: 0.01, onComplete: () => { if (statusEl) statusEl.textContent = "SYSTEMS READY"; } }, 1.2)
+      .from(q(".loader-rpm-track"), { opacity: 0, scaleX: 0, duration: 0.4, ease: "power2.out" }, 1.2)
+      .from(q(".loader-data"), { opacity: 0, y: 10, duration: 0.3, ease: "power2.out" }, 1.3);
+
+    // RPM ramp with gear shifts
+    const rpmDuration = 2.8;
+    tl.to(rpmObj, {
+      value: 14000,
+      duration: rpmDuration,
+      ease: "power2.in",
+      onUpdate: () => {
+        const rpm = Math.round(rpmObj.value);
+        if (rpmNumEl) rpmNumEl.textContent = rpm.toLocaleString();
+        // RPM bar fill
+        const pct = rpm / 14000;
+        const fill = q(".loader-rpm-fill")[0];
+        if (fill) fill.style.right = `${(1 - pct) * 100}%`;
+        // Gear shifts
+        let gear = 0;
+        if (rpm > 800) gear = 1;
+        if (rpm > 3500) gear = 2;
+        if (rpm > 5800) gear = 3;
+        if (rpm > 8200) gear = 4;
+        if (rpm > 10500) gear = 5;
+        if (rpm > 12500) gear = 6;
+        if (gear !== currentGear) {
+          currentGear = gear;
+          if (gearEl) gearEl.textContent = gears[gear];
+          if (statusEl && gear > 0) statusEl.textContent = gear === 6 ? "REDLINE" : `GEAR ${gear} ENGAGED`;
+        }
+        // Update engine sound
+        updateEngineSound(audio, pct);
+      },
+    }, 1.6);
+
+    // Phase 4: Speed streaks intensify with RPM
+    const streaks = q(".loader-streak");
+    streaks.forEach((streak, i) => {
+      const y = 10 + Math.random() * 80;
+      const w = 80 + Math.random() * 200;
+      const delay = 1.8 + (i * rpmDuration) / streaks.length + Math.random() * 0.3;
+      gsap.set(streak, { top: `${y}%`, width: w });
+      tl.to(streak, {
+        left: "110%", opacity: 0.6 + Math.random() * 0.4, duration: 0.25 + Math.random() * 0.15,
+        ease: "power1.in",
+        onComplete: () => gsap.set(streak, { opacity: 0, left: "-10%" }),
+      }, delay);
+    });
+
+    // Hold briefly at redline
+    tl.to({}, { duration: 0.25 });
 
     return () => {
       tl.kill();
+      fadeOutEngine(audio);
       document.body.style.overflow = "";
     };
   }, [loading]);
@@ -417,7 +557,6 @@ export default function Home() {
     event.preventDefault();
     setMenuOpen(false);
     history.pushState(null, "", `#${id}`);
-    // Move keyboard focus as well as the viewport; preserve native link semantics.
     target.focus({ preventScroll: true });
     if (scrollRef.current) scrollRef.current.scrollTo(target, { offset: -86, duration: 1.3 });
     else target.scrollIntoView({ behavior: "auto" });
@@ -425,69 +564,48 @@ export default function Home() {
 
   return (
     <div ref={root} className="experience">
-      {/* Loading screen */}
+      {/* ── Ignition Sequence Loader ── */}
       {loading && (
         <div ref={loaderRef} className="loader-screen" aria-live="polite" aria-label="Loading">
+          {/* Flash overlay */}
+          <div className="loader-flash" aria-hidden="true" />
+
+          {/* Speed streaks */}
+          <div className="loader-streaks" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, i) => (
+              <div key={i} className="loader-streak" />
+            ))}
+          </div>
+
           <div className="loader-inner">
-            {/* Tachometer */}
-            <div className="loader-tacho" aria-hidden="true">
-              <svg viewBox="0 0 200 200" className="loader-tacho-svg">
-                {/* Tick marks */}
-                {Array.from({ length: 30 }, (_, i) => {
-                  const angle = -135 + (i * 270) / 29;
-                  const isMajor = i % 5 === 0;
-                  const rad = (angle * Math.PI) / 180;
-                  const r1 = isMajor ? 76 : 80;
-                  const r2 = 88;
-                  return (
-                    <line
-                      key={i}
-                      x1={100 + r1 * Math.cos(rad)}
-                      y1={100 + r1 * Math.sin(rad)}
-                      x2={100 + r2 * Math.cos(rad)}
-                      y2={100 + r2 * Math.sin(rad)}
-                      stroke={i > 22 ? "#9aff00" : "#ffffff40"}
-                      strokeWidth={isMajor ? 2 : 1}
-                    />
-                  );
-                })}
-                {/* Arc track */}
-                <path
-                  d="M 32.93 167.07 A 88 88 0 1 1 167.07 167.07"
-                  fill="none"
-                  stroke="#ffffff10"
-                  strokeWidth="1.5"
-                />
-                {/* Needle */}
-                <line
-                  className="loader-needle"
-                  x1="100" y1="100"
-                  x2="100" y2="28"
-                  stroke="#9aff00"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                {/* Center dot */}
-                <circle cx="100" cy="100" r="5" fill="#9aff00" />
-                <circle cx="100" cy="100" r="2.5" fill="#090b0a" />
-              </svg>
+            {/* Giant H2R with glitch reveal */}
+            <div className="loader-h2r" aria-hidden="true">
+              H2R
+              <div className="loader-h2r-fill">H2R</div>
+              <div className="loader-glitch">H2R</div>
             </div>
 
-            {/* Brand */}
-            <div className="loader-brand">
-              <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
-              <span className="loader-logo">KAWASAKI<span className="text-lime ml-2">/</span><span className="ml-2 text-xs tracking-widest font-medium">H2R</span></span>
+            {/* RPM bar */}
+            <div className="loader-rpm-track">
+              <div className="loader-rpm-fill" />
             </div>
 
-            <div className="loader-line" aria-hidden="true" />
-
-            {/* Counter */}
-            <div className="loader-bottom">
-              <span className="loader-label">Initializing systems</span>
-              <span className="loader-percent">
-                <span className="loader-counter">0</span><span className="text-lime">%</span>
-              </span>
+            {/* Data row */}
+            <div className="loader-data">
+              <div className="loader-gear">
+                <span className="loader-gear-num"> N</span>
+              </div>
+              <div className="loader-rpm-val">
+                <span className="loader-rpm-num">0</span> RPM
+              </div>
+              <div className="loader-status">STANDBY</div>
             </div>
+          </div>
+
+          {/* Bottom brand */}
+          <div className="loader-brand-row">
+            <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
+            <span className="loader-brand-text">Kawasaki / Ninja H2R</span>
           </div>
         </div>
       )}
