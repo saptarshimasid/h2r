@@ -348,7 +348,56 @@ export default function Home() {
   const scrollRef = useRef(null);
   const menuButton = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const loaderRef = useRef(null);
   useExperience(root, scrollRef);
+
+  // Loader animation
+  useEffect(() => {
+    if (!loading || !loaderRef.current) return;
+    const el = loaderRef.current;
+    const q = gsap.utils.selector(el);
+
+    // Lock scroll during load
+    document.body.style.overflow = "hidden";
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        // Exit animation
+        gsap.to(el, {
+          clipPath: "inset(0 0 100% 0)",
+          duration: 0.85,
+          ease: "power4.inOut",
+          onComplete: () => {
+            setLoading(false);
+            document.body.style.overflow = "";
+          },
+        });
+      },
+    });
+
+    // Stagger the entrance
+    tl.from(q(".loader-brand"), { opacity: 0, y: 20, duration: 0.6, ease: "power3.out" })
+      .from(q(".loader-line"), { scaleX: 0, duration: 0.5, ease: "power2.out" }, 0.2)
+      .fromTo(q(".loader-needle"), { rotation: -135 }, { rotation: 135, duration: 1.8, ease: "power2.out", svgOrigin: "100 100" }, 0.3)
+      .fromTo(q(".loader-counter"), { innerText: 0 }, {
+        innerText: 100,
+        duration: 1.8,
+        ease: "power2.out",
+        snap: { innerText: 1 },
+        onUpdate: function () {
+          const target = this.targets()[0];
+          if (target) target.textContent = Math.round(this.targets()[0].innerText || 0);
+        },
+      }, 0.3)
+      .from(q(".loader-label"), { opacity: 0, y: 10, duration: 0.5 }, 0.5)
+      .to({}, { duration: 0.3 }); // Brief hold before exit
+
+    return () => {
+      tl.kill();
+      document.body.style.overflow = "";
+    };
+  }, [loading]);
 
   useEffect(() => {
     const escape = (event) => {
@@ -376,6 +425,73 @@ export default function Home() {
 
   return (
     <div ref={root} className="experience">
+      {/* Loading screen */}
+      {loading && (
+        <div ref={loaderRef} className="loader-screen" aria-live="polite" aria-label="Loading">
+          <div className="loader-inner">
+            {/* Tachometer */}
+            <div className="loader-tacho" aria-hidden="true">
+              <svg viewBox="0 0 200 200" className="loader-tacho-svg">
+                {/* Tick marks */}
+                {Array.from({ length: 30 }, (_, i) => {
+                  const angle = -135 + (i * 270) / 29;
+                  const isMajor = i % 5 === 0;
+                  const rad = (angle * Math.PI) / 180;
+                  const r1 = isMajor ? 76 : 80;
+                  const r2 = 88;
+                  return (
+                    <line
+                      key={i}
+                      x1={100 + r1 * Math.cos(rad)}
+                      y1={100 + r1 * Math.sin(rad)}
+                      x2={100 + r2 * Math.cos(rad)}
+                      y2={100 + r2 * Math.sin(rad)}
+                      stroke={i > 22 ? "#9aff00" : "#ffffff40"}
+                      strokeWidth={isMajor ? 2 : 1}
+                    />
+                  );
+                })}
+                {/* Arc track */}
+                <path
+                  d="M 32.93 167.07 A 88 88 0 1 1 167.07 167.07"
+                  fill="none"
+                  stroke="#ffffff10"
+                  strokeWidth="1.5"
+                />
+                {/* Needle */}
+                <line
+                  className="loader-needle"
+                  x1="100" y1="100"
+                  x2="100" y2="28"
+                  stroke="#9aff00"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                {/* Center dot */}
+                <circle cx="100" cy="100" r="5" fill="#9aff00" />
+                <circle cx="100" cy="100" r="2.5" fill="#090b0a" />
+              </svg>
+            </div>
+
+            {/* Brand */}
+            <div className="loader-brand">
+              <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
+              <span className="loader-logo">KAWASAKI<span className="text-lime ml-2">/</span><span className="ml-2 text-xs tracking-widest font-medium">H2R</span></span>
+            </div>
+
+            <div className="loader-line" aria-hidden="true" />
+
+            {/* Counter */}
+            <div className="loader-bottom">
+              <span className="loader-label">Initializing systems</span>
+              <span className="loader-percent">
+                <span className="loader-counter">0</span><span className="text-lime">%</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <a className="skip-link" href="#hero">Skip to content</a>
 
       {/* 1 — Modern header */}
